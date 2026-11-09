@@ -1,45 +1,74 @@
-# S23 · Taller 6 — Observatorio Financiero (Streamlit)
+# Observatorio multiactivo · Comportamiento histórico de activos financieros
 
-Aplicación web hecha con Python y Streamlit para comparar activos financieros con precios históricos reales.
-Proyecto individual de **Lenguajes de Programación · Ingeniería Financiera · ITM**.
+Aplicación interactiva hecha con Python y Streamlit para analizar el comportamiento histórico de varios activos de distinta clase y comunicar los hallazgos con tablas, gráficos y conclusiones generadas con los datos.
 
-## ¿Qué hace?
-- Permite elegir de 1 a 6 activos (mínimo 3 para el taller), el período (3 meses a 5 años), el capital inicial y la ventana de la media móvil.
-- Muestra precios normalizados (base 100), valor de una cartera de pesos iguales, rendimientos diarios, indicadores por activo, medias móviles, estadística descriptiva, correlaciones y drawdown.
-- Indica de forma visible cuando usa **datos simulados** (si Yahoo Finance no responde o si el usuario elige la fuente de práctica). Los datos simulados no son cotizaciones reales.
+**Pregunta de investigación**
 
-## ¿De dónde provienen los datos?
-De **Yahoo Finance**, mediante la biblioteca `yfinance`, con precios de cierre ajustados por dividendos y splits (`auto_adjust=True`). Los datos se guardan en caché 30 minutos.
+> ¿Qué activo ofreció mejor rentabilidad ajustada por riesgo entre 2021 y 2025, y cómo cambió la correlación entre los activos entre el año bajista de 2022 y la recuperación de 2023 a 2025?
 
-## ¿Cómo se ejecuta?
+## Decisiones del equipo
+
+### 1. ¿Qué activos queremos investigar y por qué?
+| Ticker | Clase | Por qué se eligió |
+|---|---|---|
+| SPY | ETF de acciones (S&P 500) | Referencia del mercado accionario de EE. UU.; muy líquido |
+| GLD | ETF de oro (commodity) | Activo refugio tradicional; muy líquido |
+| BTC-USD | Criptomoneda | Alta volatilidad; contrasta con los demás |
+| TLT | ETF de bonos del Tesoro de EE. UU. a 20 años o más | Renta fija larga, sensible a tasas de interés |
+
+Se eligieron cuatro clases de activos distintas porque con activos del mismo tipo las correlaciones y los riesgos serían muy parecidos y no habría contraste que analizar. Los cuatro tienen historia diaria disponible en Yahoo Finance y buena liquidez. La aplicación permite sumar CVX, JNJ, PG, QQQ, AAPL y MSFT.
+
+**Período: 2021-01-01 a 2025-12-31.** Cinco años cerrados: incluyen un mercado alcista (2021), un año de caídas y alza de tasas de interés (2022, hipótesis que la app contrasta con los datos de SPY) y una recuperación (2023–2025). Un período más corto ocultaría esos regímenes; uno más largo mezclaría contextos muy distintos. Para no mezclar contextos, la app permite ver los resultados por subperíodo (2021, 2022 y 2023–2025). La fecha final fija hace los resultados reproducibles.
+
+### 2. ¿Qué queremos descubrir?
+La pregunta de arriba, con estas preguntas de apoyo (cada una se responde en una pestaña):
+1. ¿Cuál activo tuvo mayor rendimiento anualizado y cuál mayor volatilidad?
+2. ¿Cuál tuvo el peor drawdown y cuánto tardó en recuperar su máximo previo?
+3. ¿Los activos considerados refugio (oro y bonos) compensaron las caídas de SPY?
+4. ¿Qué combinación de dos activos minimizó el riesgo conjunto con pesos 50/50?
+
+### 3. ¿Qué información y herramientas necesitamos?
+- **Datos:** Yahoo Finance mediante `yfinance`, precios de cierre ajustados (`auto_adjust=True`).
+- **Herramientas:** `pandas` (series de tiempo, `pct_change`, `rolling`, `corr`), `numpy`, `plotly` y `streamlit`.
+- **Indicadores:** rendimiento acumulado y anualizado, volatilidad anualizada, ratio rendimiento/riesgo, máximo drawdown y tiempo de recuperación, correlación (total, por subperíodo y móvil), estadística descriptiva, curtosis, valores atípicos (1,5 × IQR) y riesgo de pares 50/50.
+- **Visualizaciones:** base 100 (con escala logarítmica opcional), drawdown, dispersión riesgo-rendimiento, volatilidad móvil, mapas de calor, histograma y boxplot.
+
+## Definiciones de los indicadores
+| Indicador | Cálculo |
+|---|---|
+| Rendimiento diario | `P_t / P_(t−1) − 1` |
+| Rendimiento anualizado | `(P_final / P_inicial)^(252/n) − 1`, con n = número de rendimientos |
+| Volatilidad anualizada | desviación estándar diaria (ddof = 1) × √252 |
+| Rendimiento/riesgo | `(rendimiento anualizado − tasa libre de riesgo) / volatilidad anualizada` (tipo Sharpe) |
+| Drawdown | `P_t / máximo previo − 1`; se reporta el máximo y los días de valle a recuperación |
+| Correlación | Pearson entre rendimientos diarios |
+| Par 50/50 | volatilidad anualizada de la media de los rendimientos de los dos activos (rebalanceo diario) |
+
+## Supuestos y limitaciones
+- **Fechas comunes:** BTC-USD cotiza todos los días y los demás solo en días hábiles. Se conservan únicamente las fechas en que cotizan todos los activos y se anualiza con 252 sesiones. Anualizar BTC con 365 días daría otra volatilidad.
+- **Tasa libre de riesgo:** 0 % por defecto (ajustable en la barra lateral). Con 0 %, el ratio es rendimiento sobre volatilidad.
+- Los resultados son históricos y no garantizan el futuro; no incluyen costos de transacción ni impuestos.
+- Si Yahoo Finance no responde, la app avisa en rojo y muestra **datos simulados**, que no son cotizaciones reales.
+- Ejercicio académico: no constituye asesoría financiera.
+
+## Estructura
+```
+app.py                 interfaz de Streamlit
+calculos.py            funciones de cálculo (sin Streamlit)
+tests_calculos.py      pruebas con series de resultado conocido
+requirements.txt
+assets/banner_financiero.png
+```
+
+## Cómo ejecutarla
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
 ```
-La app abre en `http://localhost:8501`. La carpeta `assets/` debe estar junto a `app.py`.
+Pruebas de los cálculos: `python -m unittest tests_calculos -v`
 
-En Google Colab: ejecuta `streamlit run app.py` en segundo plano y abre la URL de un túnel (Cloudflare). Ese enlace es temporal; la evidencia permanente es este repositorio.
-
-## ¿Qué significan los indicadores?
-| Indicador | Cómo se calcula | Cómo se lee |
-|---|---|---|
-| Rendimiento diario | `P_t / P_(t-1) − 1` (`pct_change`) | Cambio porcentual de un día al siguiente |
-| Rendimiento acumulado (activo) | `P_final / P_inicial − 1` | Cuánto cambió el precio en todo el período |
-| Rendimiento acumulado (cartera) | `∏(1 + r_t) − 1` con r_t = media de los rendimientos diarios | Cartera de pesos iguales con rebalanceo diario, sin comisiones ni impuestos |
-| Precio normalizado (base 100) | `P_t / P_0 × 100` | Permite comparar activos de precios distintos desde un mismo punto de partida |
-| Volatilidad anualizada | `desv. estándar diaria × √252` | Dispersión de los rendimientos; más volatilidad es más riesgo, no más rentabilidad |
-| Media móvil | Promedio de las últimas *n* sesiones | Suaviza el ruido y muestra la tendencia reciente; llega con retraso y no predice |
-| Correlación (Pearson) | Entre rendimientos diarios, de −1 a +1 | Relación lineal entre dos activos; no implica causalidad |
-| Drawdown | `precio / máximo previo − 1` | Caída desde el último pico |
-
-## Limitaciones
-- Los resultados históricos no garantizan rentabilidades futuras.
-- No se incluyen costos de transacción, impuestos ni dividendos fuera del ajuste de precios.
-- Yahoo Finance puede fallar o limitar consultas; la app lo avisa y no oculta el uso de datos simulados.
-- Uso académico: no constituye asesoría financiera.
-
-## Contenido de la carpeta
-`app.py` · `requirements.txt` · `README.md` · `assets/banner_financiero.png` · informe PDF · `generar_informe.py` (genera el informe con datos reales).
-
-## Autor
-Sebastián Giraldo · Ingeniería Financiera · ITM
+## Fuentes consultadas
+- yfinance, documentación: https://ranaroussi.github.io/yfinance/
+- pandas, series de tiempo: https://pandas.pydata.org/docs/user_guide/timeseries.html
+- pandas, ventanas móviles: https://pandas.pydata.org/docs/user_guide/window.html
+- MIT OpenCourseWare 15.401, Finance Theory I: https://ocw.mit.edu/courses/15-401-finance-theory-i-fall-2008/
